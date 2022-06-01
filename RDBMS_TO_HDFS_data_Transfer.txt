@@ -1,0 +1,321 @@
+
+we have a​ test_db database in mysql. We have an input tableCustomers inside​ test_db. The table has a Primary key on the Price column ​(which of course is not the right choice asprices may repeat when data grows)
+
+Task 1) Before performing the sqoop import, using the sqoop command display the data present in mysql Customers table.The output of the command should not display on the console,rather should be redirected to log file named ‘query.output’. Display the contents of the query.output file, share the Snapshot of the command and the output. 
+
+sqoop-eval \
+--connect "jdbc:mysql://quickstart.cloudera:3306/test_db" \
+--username root \
+--password cloudera \
+--query "SELECT * FROM Customers"  1>query.out 2>query.err
+
+
+> [cloudera@quickstart ~]$ cat query.out
+
+2) Perform a single sqoop import inside the directory in hdfs named sqoop_importdir, considering all the following points: 
+
+● Import all the columns except Cust_Type in hdfs.
+
+  sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--columns Cust_Id,Customer_Name,Purchase_Date,Item,City,Price \
+--target-dir /user/cloudera/sqoop_importdir \
+--append
+ 
+[cloudera@quickstart ~]$ hadoop fs -cat /user/cloudera/sqoop_importdir/*
+
+400,Rini,2019-01-30,Handbag,Pune,1000
+10000,Raman,2019-09-04,Misc,Cochin,9000
+100,Rishi,2020-08-16,Mobile,Kanpur,10000
+300,Priya,2018-06-25,Mobile,Jaipur,20000
+700,Deepu,2019-12-12,Appliances,Mumbai,25000
+200,Venu,2019-05-04,Laptop,Bangalore,61000
+[cloudera@quickstart ~]$ 
+hadoop fs -cat /user/cloudera/sqoop_importdir/*
+
+ 
+● Include only the purchases made after 2019-01-01
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--columns Cust_Id,Customer_Name,Purchase_Date,Item,City,Price \
+--where "Purchase_Date >'2019-01-01'" \
+--target-dir /user/cloudera/sqoop_importdir \
+--delete-target-dir
+  
+  
+● The output data generated should have fields separated by | and rows separated by ; (semicolon)
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--columns Cust_Id,Customer_Name,Purchase_Date,Item,City,Price \
+--fields-terminated-by '|' \
+--lines-terminated-by ';' \
+--target-dir /user/cloudera/sqoop_importdir \
+--delete-target-dir
+
+● While importing, Nulls in the data , should be overridden with ‘NA’
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--columns Cust_Id,Customer_Name,Purchase_Date,Item,City,Price \
+--target-dir /user/cloudera/sqoop_importdir \
+--null-non-string "NA" \
+--delete-target-dir
+
+● Redirect the log messages generated on screen to the files log_out1 and log_out2.Display the contents of the log_out2 file , when sqoop import is successful,share the snapshot of the number of records retrieved.
+
+sqoop import \ 
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--warehouse-dir /user/cloudera/log_report 1>log_out1.output 2>log_out2.err 
+
+cat log_out2.err 
+  
+● Display the contents of the sqoop_importdir
+
+hadoop fs -ls /user/cloudera/sqoop_importdir
+
+● Now Again modify and run your sqoop import command ,so that cust_id column can be used to decide the input splits, as the Primary key column is not proper. Also ensure that the output directory remains as sqoop_importdir, and the previously imported contents are automatically deleted and new contents are filled in the output directory.
+
+sqoop import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--split-by cust_id \
+--target-dir /user/cloudera/sqoop_importdir \
+--delete-target-dir
+
+● Display the contents of the output directory now and the first 10 records from the mapper output files (hint: use head command)
+
+hadoop fs -ls /user/cloudera/sqoop_importdir/*
+
+hadoop fs -cat /user/cloudera/sqoop_importdir/* |head
+
+
+● Now Suppose an outlier comes into the mysql table:The new record inserted is :
+
+Cust_Id Customer_Name Purchase_Date Item City Price Cust_Type
+10000 Raman 2019/09/04 Misc Cochin 9000 Regular
+
+Mention the sqoop import command you will frame from your end to deal with such a situation to ensure even work distribution among mappers, using customized bounding val query.
+Note: you got to know that cust_id 10000 is erroneous record and should not be taken care.
+
+sqoop import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Customers \
+--split-by cust_id \
+--boundary-query "SELECT 100,700" \
+--warehouse-dir /user/cloudera/sqoop_importdir \
+--delete-target-dir
+
+Question 2 -
+
+A) Using a single sqoop import command, Import all the tables present in test_new_db to hdfs excluding the Country_Tbl. You have to do it with a single sqoop command. Also, City_Tbl should have 3 output files generated in hdfs. All the output files should be stored inside sqoop_all_tbl directory in hdfs, with sub-directories of each table name created inside the main directory. Share the snapshot of the command. (5 marks)
+
+sqoop-import-all-tables \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_new_db \
+--username root \
+--password cloudera \
+--exclude-tables Country_Tbl \
+-m 3 \
+--warehouse-dir /user/cloudera/sqoop_all_tbl \
+--autoreset-to-one-mapper 
+
+
+B) Show the contents of the output directory: (Share Snapshot) (5 marks)
+
+[cloudera@quickstart ~]$ hadop fs -ls /user/cloudera/sqoop_all_tbl
+bash: hadop: command not found
+[cloudera@quickstart ~]$ hadoop fs -ls /user/cloudera/sqoop_all_tbl
+Found 2 items
+drwxr-xr-x   - cloudera cloudera          0 2022-05-27 08:09 /user/cloudera/sqoop_all_tbl/City_Tbl
+drwxr-xr-x   - cloudera cloudera          0 2022-05-27 08:10 /user/cloudera/sqoop_all_tbl/State_Tbl
+[cloudera@quickstart ~]$ hadoop fs -ls /user/cloudera/sqoop_all_tbl/*
+Found 4 items
+-rw-r--r--   1 cloudera cloudera          0 2022-05-27 08:09 /user/cloudera/sqoop_all_tbl/City_Tbl/_SUCCESS
+-rw-r--r--   1 cloudera cloudera         40 2022-05-27 08:09 /user/cloudera/sqoop_all_tbl/City_Tbl/part-m-00000
+-rw-r--r--   1 cloudera cloudera         34 2022-05-27 08:09 /user/cloudera/sqoop_all_tbl/City_Tbl/part-m-00001
+-rw-r--r--   1 cloudera cloudera         34 2022-05-27 08:09 /user/cloudera/sqoop_all_tbl/City_Tbl/part-m-00002
+Found 2 items
+-rw-r--r--   1 cloudera cloudera          0 2022-05-27 08:10 /user/cloudera/sqoop_all_tbl/State_Tbl/_SUCCESS
+-rw-r--r--   1 cloudera cloudera         51 2022-05-27 08:10 /user/cloudera/sqoop_all_tbl/State_Tbl/part-m-00000
+
+
+
+Question 3-
+
+ We have a Categories Table in test_db in Mysql. On this table both inserts and updates are performed from time to time. Do the following:
+ 
+ 
+A) Import the Categories table in hdfs but during the import ,do proper Null value handling:
+
+● String Columns nulls should be replaced with ‘\N’ (so that in file it should be read as \n and Non-string column nulls should be replaced with -1
+● Use a warehouse directory
+● We also want to see the query run by each mapper internally Share the import command you will use,keeping in mind all of the above.Initially all records to be pulled in. (10 marks)
+
+sqoop import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Categories \
+--warehouse-dir /user/cloudera/sqoop_importdir \
+--delete-target-dir \
+--null-non-string "-1" \
+--null-string "\N" \
+--verbose
+
+B) New Records are added to the table and also existing records are updated,(refer the mysql_commands text file for the insert and update commands),so import only those newly inserted/updated records from Categories table to hdfs.The delta records should get appended to existing directory.Share the import command you will use this time, to get only delta records
+
+sqoop import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password cloudera \
+--table Categories \
+--warehouse-dir /user/cloudera/sqoop_importdir \
+--incremental lastmodified \
+--check-column inclusion_date \
+--last-value 0 \
+--merge-key category_id
+
+
+>
+22/06/01 11:03:44 INFO tool.ImportTool: Incremental import complete! To run another incremental import of all data following this import, supply the following arguments:
+22/06/01 11:03:44 INFO tool.ImportTool:  --incremental lastmodified
+22/06/01 11:03:44 INFO tool.ImportTool:   --check-column inclusion_date
+22/06/01 11:03:44 INFO tool.ImportTool:   --last-value 2022-06-01 10:55:11.0
+22/06/01 11:03:44 INFO tool.ImportTool: (Consider saving this with 'sqoop job --create')
+
+
+
+C)After this second import, how many records do you see in the hdfs folder now? Did you find any duplicate records, give details if any?
+
+No duplicate records as merge-key has been used in the sqoop command.
+
+[cloudera@quickstart ~]$ hadoop fs -cat  /user/cloudera/sqoop_importdir/Categories/part-r-00000/
+1,2,Football,2020-04-30 00:00:00.0
+10,4,Athletics,2020-05-02 00:00:00.0
+11,4,Cycling,2022-06-01 10:49:12.0
+12,5,Skating,2022-06-01 10:49:12.0
+13,6,Surfing,2022-06-01 10:48:48.0
+14,2,Mountaineering,2022-06-01 10:48:48.0
+2,2,Handball,2020-05-01 00:00:00.0
+3,2,Baseball & Softball,2020-05-01 00:00:00.0
+4,2,Basketball,2020-04-30 00:00:00.0
+5,3,Tennis,2020-04-30 00:00:00.0
+6,3,Hockey,2020-05-01 00:00:00.0
+7,3,Swimming,2020-05-01 00:00:00.0
+8,3,Cardio Equipment,2020-05-01 00:00:00.0
+9,4,Strength Training,2020-05-01 00:00:00.0
+
+D)Create a new table in test_db named Categories_new. The command hasbeen shared in mysql_commands text file.
+This newly created table does not have a Primary key.We want to do periodic imports and updates in this mysql table. But we do not wantany duplicate records in the hdfs post import. Also we want to automate the processof import & want a good way to manage the password. Choose a differentwarehouse directory this time.
+
+
+create table Categories_new AS SELECT * FROM Categories;
+
+
+●First time we need to pull all records in hdfs.
+
+echo -n "cloudera" >> /home/cloudera/Desktop/week5_datasets/.categoriespassword
+
+sqoop job \
+--create categories_job \
+-- import \
+--connect jdbc:mysql://quickstart.cloudera:3306/test_db \
+--username root \
+--password-file  file:///home/cloudera/Desktop/week5_datasets/.categoriespassword \
+--table Categories_new \
+--warehouse-dir /user/cloudera/sqoop_importdir_new \
+--autoreset-to-one-mapper \
+--incremental lastmodified \
+--check-column inclusion_date \
+--last-value 0 \
+--merge-key category_id
+
+[cloudera@quickstart ~]$ sqoop job --list
+Available jobs:
+  categories_job
+
+[cloudera@quickstart ~]$ sqoop job --exec categories_job
+
+[cloudera@quickstart ~]$ sqoop job --show categories_job
+
+
+[cloudera@quickstart ~]$ hadoop fs -ls /user/cloudera/sqoop_importdir_new/Categories_new/
+Found 2 items
+-rw-r--r--   1 cloudera cloudera          0 2022-06-01 12:37 /user/cloudera/sqoop_importdir_new/Categories_new/_SUCCESS
+-rw-r--r--   1 cloudera cloudera        525 2022-06-01 12:37 /user/cloudera/sqoop_importdir_new/Categories_new/part-m-00000
+[cloudera@quickstart ~]$ hadoop fs -cat  /user/cloudera/sqoop_importdir_new/Categories_new/part-m-00000
+1,2,Football,2020-04-30 00:00:00.0
+2,2,Handball,2020-05-01 00:00:00.0
+3,2,Baseball & Softball,2020-05-01 00:00:00.0
+4,2,Basketball,2020-04-30 00:00:00.0
+5,3,Tennis,2020-04-30 00:00:00.0
+6,3,Hockey,2020-05-01 00:00:00.0
+7,3,Swimming,2020-05-01 00:00:00.0
+8,3,Cardio Equipment,2020-05-01 00:00:00.0
+9,4,Strength Training,2020-05-01 00:00:00.0
+10,4,Athletics,2020-05-02 00:00:00.0
+11,4,Cycling,2022-06-01 10:49:12.0
+12,5,Skating,2022-06-01 10:49:12.0
+13,6,Surfing,2022-06-01 10:48:48.0
+14,2,Mountaineering,2022-06-01 10:48:48.0
+
+
+●Second time to pull only the delta records,but without duplicates in hdfs
+
+[cloudera@quickstart ~]$ sqoop job --exec categories_job
+
+[cloudera@quickstart ~]$ hadoop fs -ls  /user/cloudera/sqoop_importdir_new/Categories_new/
+Found 2 items
+-rw-r--r--   1 cloudera cloudera          0 2022-06-01 12:49 /user/cloudera/sqoop_importdir_new/Categories_new/_SUCCESS
+-rw-r--r--   1 cloudera cloudera        594 2022-06-01 12:49 /user/cloudera/sqoop_importdir_new/Categories_new/part-r-00000
+
+
+[cloudera@quickstart ~]$ hadoop fs -cat  /user/cloudera/sqoop_importdir_new/Categories_new/part-r-00000
+1,2,Football,2020-04-30 00:00:00.0
+10,4,Athletics,2020-05-02 00:00:00.0
+11,4,Cycling,2022-06-01 10:49:12.0
+12,5,Skating,2022-06-01 10:49:12.0
+13,4,Surfing,2022-06-01 12:41:12.0
+14,4,Mountaineering,2022-06-01 12:41:12.0
+15,6,Boxing,2022-06-01 12:41:00.0
+16,6,Cycling,2022-06-01 12:41:00.0
+2,2,Handball,2020-05-01 00:00:00.0
+3,2,Baseball & Softball,2020-05-01 00:00:00.0
+4,2,Basketball,2020-04-30 00:00:00.0
+5,3,Tennis,2020-04-30 00:00:00.0
+6,3,Hockey,2020-05-01 00:00:00.0
+7,3,Swimming,2020-05-01 00:00:00.0
+8,3,Cardio Equipment,2020-05-01 00:00:00.0
+9,4,Strength Training,2020-05-01 00:00:00.0
+[cloudera@quickstart ~]$ 
+
+
+
+E)How many records do you see this time in hdfs post second import? Do yousee any duplicate records now?​ 
+There are records present in the file. no duplicate records are present.
+
+F)Are any mapper files generated in hdfs this time after the second import?Explain.
+No mapper file is generated only read file>part-r-00000 generated after second run.
+
+G)Share the command you will use to see the last value of a Saved Sqoop Job.
+[cloudera@quickstart ~]$ sqoop job --show categories_job
